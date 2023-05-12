@@ -15,11 +15,11 @@ i = read_image("Angular.png")
 r = make_rotations(i)
 
 #pis, palette, pattern_count, reverse_fn = adj_preprocess(r)
-pis, palette, pattern_count, reverse_fn = overlap_preprocess(r, 2, 2)
+pis, palette, pattern_count, reverse_fn = overlap_preprocess(r, 3, 3)
 
 config = WFCConfig(
-    h = 10,
-    w = 10,
+    h = 30,
+    w = 30,
     model = make_adacent_model(pattern_count, pis)
 )
 

@@ -33,6 +33,11 @@ def adj_preprocess(imgs): # Returns: pis, palette, pattern_count, reverse_fn
     
     return pis, palette, pattern_count, reverse_fn
 
+def _pad(pi, y, x):
+    # There should be a better way of doing this
+    return t.nn.functional.pad(pi.unsqueeze(0).to(t.float), (0, y, 0, x), 'replicate').to(t.long).squeeze(0)
+
+
 def overlap_preprocess(imgs, nx, ny):
     i32s = [to_i32(img) for img in imgs]
     tile_palette = make_palette(i32s)
@@ -46,7 +51,7 @@ def overlap_preprocess(imgs, nx, ny):
         all_blocks.append(blocks)
 
     all_blocks = t.concat(all_blocks)
-    palette, inverse = t.unique(blocks, dim=0, return_inverse=True)
+    palette, inverse = t.unique(all_blocks, dim=0, return_inverse=True)
 
     pis = []
     i=0
@@ -54,11 +59,18 @@ def overlap_preprocess(imgs, nx, ny):
         h, w = ti.shape
         i2 = i +((h-ny+1)*(w-nx+1))
         pi = inverse[i:i2].unflatten(0, (h-ny+1, w-nx+1))
-        i2 = i
+        i = i2
         pis.append(pi)
 
     def reverse_fn(pi):
-        ti = palette[:, 0, 0][pi]
+        pi = _pad(pi, ny-1, nx-1)
+        h, w = pi.shape
+        px = t.maximum(t.tensor([0]), t.arange(0, w) - (w -nx)).unsqueeze(0).broadcast_to(pi.shape)
+        py = t.maximum(t.tensor([0]), t.arange(0, h) - (h -ny)).unsqueeze(1).broadcast_to(pi.shape)
+
+        pp = t.stack([pi,py,px])
+        
+        ti = palette[tuple(pp)]
         return from_i32(unpalettize(tile_palette, ti))
 
     return pis, palette, palette.shape[0], reverse_fn

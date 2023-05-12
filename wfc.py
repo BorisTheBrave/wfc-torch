@@ -94,6 +94,16 @@ def run(config: WFCConfig):
                 print(p2[y,x].item(), end="")
             print()
 
+    # Remove any patterns that are already impossible
+    for dir,prop in zip(dirs, propagators):
+        indices = t.arange(0, possibilities.shape[0])
+        mask = dir.filter(indices, h, w)
+        # Does the pattern have any possible support
+        possible_patterns = prop.to_dense().amax(dim=0)
+        possibilities[mask] *= possible_patterns
+        
+
+    # Main loop
     while True:
         # decide batch size, n
         # indices = choose n indices, possibly unnear each other
@@ -102,6 +112,11 @@ def run(config: WFCConfig):
         # set changedTiles = list of changed tiles
 
         # Pick a random index to update
+        contradiction = (possibilities.sum(1) == 0).nonzero().flatten()
+        if len(contradiction) > 0:
+            print("contradiction at ", contradiction.nonzero()[:1])
+            break
+
         undecided = (possibilities.sum(1) > 1).nonzero().flatten()
         if len(undecided) == 0:
             break
