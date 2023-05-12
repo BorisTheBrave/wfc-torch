@@ -5,6 +5,7 @@ from collections import namedtuple
 import numpy
 from dataclasses import dataclass
 import torch as t
+import datetime
 
 LOG_LEVEL = 0
 
@@ -56,15 +57,20 @@ class WFCConfig:
     h: int
     w: int
     model: Model
+    device: str = "cpu"
 
 def run(config: WFCConfig):
+    numpy.random.seed(0)
+
+    start = datetime.datetime.now()
     h = config.h
     w = config.w
     model = config.model
+    device = config.device
     pattern_count = model.pattern_count
-    frequenies = model.frequencies
-    propagators = model.propagators
-    possibilities = t.ones((w * h, pattern_count,))
+    frequencies = model.frequencies
+    propagators = [p.to(device) for p in model.propagators]
+    possibilities = t.ones((w * h, pattern_count,), device=device)
 
 
     def print_possibilities():
@@ -117,22 +123,24 @@ def run(config: WFCConfig):
             print("contradiction at ", contradiction.nonzero()[:1])
             break
 
-        undecided = (possibilities.sum(1) > 1).nonzero().flatten()
+        undecided = (possibilities.sum(1) > 1).nonzero().flatten().cpu()
         if len(undecided) == 0:
             break
 
-        i = numpy.random.choice(undecided, (1,)).item()
+        print(len(undecided))
+
+        i = numpy.random.choice(undecided.cpu().numpy(), (1,)).item()
         # Pick a random possibility
         # TODO: Use frequencies
         possibles = (possibilities[i] > 0).nonzero().flatten()
-        p = numpy.random.choice(possibles).item()
+        p = numpy.random.choice(possibles.cpu().numpy()).item()
         if LOG_LEVEL >= 5: print(f"{i=}")
         if LOG_LEVEL >= 5: print(f"{p=}")
 
         # Select that specific possibility
         possibilities[i, :] = 0
         possibilities[i, p] = 1
-        changed_cells = t.tensor([i], dtype=int)
+        changed_cells = t.tensor([i], device=device, dtype=int)
 
         while len(changed_cells) > 0:
             if LOG_LEVEL >= 6: print(f"{changed_cells=}")
@@ -170,7 +178,10 @@ def run(config: WFCConfig):
 
     decided = get_decided(possibilities).reshape(h, w)
 
-    return decided
+    end = datetime.datetime.now()
+    print(f"Took {end-start}")
+
+    return decided.cpu()
 
 
     

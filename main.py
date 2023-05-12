@@ -18,9 +18,10 @@ r = make_rotations(i)
 pis, palette, pattern_count, reverse_fn = overlap_preprocess(r, 3, 3)
 
 config = WFCConfig(
-    h = 30,
-    w = 30,
-    model = make_adacent_model(pattern_count, pis)
+    h = 300,
+    w = 300,
+    model = make_adacent_model(pattern_count, pis),
+    device="cpu"
 )
 
 result = run(config)
