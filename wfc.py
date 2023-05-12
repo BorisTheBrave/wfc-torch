@@ -6,6 +6,7 @@ import numpy
 from dataclasses import dataclass
 import torch as t
 import datetime
+import tqdm
 
 LOG_LEVEL = 0
 
@@ -72,6 +73,9 @@ def run(config: WFCConfig):
     propagators = [p.to(device) for p in model.propagators]
     possibilities = t.ones((w * h, pattern_count,), device=device)
 
+    progress = tqdm.tqdm(total=possibilities.shape[0])
+
+
 
     def print_possibilities():
         p2 = possibilities.reshape((h, w, pattern_count))
@@ -127,7 +131,7 @@ def run(config: WFCConfig):
         if len(undecided) == 0:
             break
 
-        print(len(undecided))
+        progress.update(possibilities.shape[0] - len(undecided) - progress.n)
 
         i = numpy.random.choice(undecided.cpu().numpy(), (1,)).item()
         # Pick a random possibility
@@ -159,7 +163,7 @@ def run(config: WFCConfig):
                 if LOG_LEVEL >= 10: print(f"{dir.name} {rightable_possibles=}")
 
                 # Check which patterns are supported
-                right_support = t.sign(rightable_possibles @ prop) # b p
+                right_support = t.sign(prop @ rightable_possibles.T).T # b p
                 if LOG_LEVEL >= 10: print(f"{dir.name} {right_support=}")
 
                 # Find changed cells
@@ -179,6 +183,7 @@ def run(config: WFCConfig):
     decided = get_decided(possibilities).reshape(h, w)
 
     end = datetime.datetime.now()
+    progress.close()
     print(f"Took {end-start}")
 
     return decided.cpu()
