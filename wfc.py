@@ -48,7 +48,7 @@ def make_adacent_model(pattern_count, pis: list[t.Tensor]):
             props[i][list(adj)] = 1
 
     for i in range(len(props)):
-        props[i] = props[i].to_sparse_csr()
+        props[i] = props[i].T.to_sparse_csr()
 
     return Model(pattern_count, frequencies, props)
 
@@ -61,7 +61,7 @@ class WFCConfig:
     device: str = "cpu"
 
 def run(config: WFCConfig):
-    numpy.random.seed(0)
+    #numpy.random.seed(0)
 
     start = datetime.datetime.now()
     h = config.h
