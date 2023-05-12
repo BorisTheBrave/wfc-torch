@@ -5,6 +5,7 @@ from collections import namedtuple
 import numpy
 from wfc import run, make_adacent_model, WFCConfig, Model
 from preprocess import adj_preprocess, overlap_preprocess, make_rotations
+from torch.profiler import profile, record_function, ProfilerActivity
 
 LOG_LEVEL = 0
 
@@ -24,6 +25,16 @@ config = WFCConfig(
     device="cpu"
 )
 
-result = run(config)
+if False:
+    with profile(activities=[ProfilerActivity.CPU], record_shapes=True, with_stack=True) as prof:
+        with record_function("run"):
+            result = run(config)
+    print(prof.key_averages().table(sort_by="cpu_time_total", row_limit=10))
+    print(prof.key_averages().table(sort_by="cuda_time_total", row_limit=10))
+    print(prof.key_averages(group_by_stack_n=2).table(sort_by="cpu_time_total", row_limit=10))
+    prof.export_chrome_trace(f"trace_{config.device}.json")
+    prof.export_stacks(f"profiler_stacks_{config.device}.txt", "self_cpu_time_total")
+else:
+    result = run(config)
 output = reverse_fn(result)
 write_png(output, "output.png")
