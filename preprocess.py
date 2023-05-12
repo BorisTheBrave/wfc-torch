@@ -16,6 +16,9 @@ def palettize(palette, i32):
 def unpalettize(palette, pi):
     return palette[pi]
 
+def make_rotations(img):
+    return [t.rot90(img, k, [1,2]) for k in range(4)]
+
 
 def adj_preprocess(imgs): # Returns: pis, palette, pattern_count, reverse_fn
     i32s = [to_i32(img) for img in imgs]
@@ -58,4 +61,4 @@ def overlap_preprocess(imgs, nx, ny):
         ti = palette[:, 0, 0][pi]
         return from_i32(unpalettize(tile_palette, ti))
 
-    return pi, palette, palette.shape[0], reverse_fn
+    return pis, palette, palette.shape[0], reverse_fn

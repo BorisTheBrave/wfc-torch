@@ -26,26 +26,29 @@ class Model:
     frequencies: t.tensor # shape=(p)
     propagators: list[t.Tensor] # shape=(d,from,to). Should be sparse, and of tpe float, with 0 and 1 entries
 
-def make_adacent_model(pattern_count, pi: t.Tensor):
+def make_adacent_model(pattern_count, pis: list[t.Tensor]):
     frequencies = t.zeros(pattern_count)
-    frequencies.index_add_(0, pi.flatten(), _cheap_ones((pi.numel(),)))
+    for pi in pis:
+        frequencies.index_add_(0, pi.flatten(), _cheap_ones((pi.numel(),)))
 
-    h, w = pi.shape
-    pi = pi.flatten()
-    propagators = []
-    for dir in dirs:
-        indices = t.arange(0, len(pi), step=1, dtype=t.long,)
-        a = indices[dir.filter(indices, h, w)]
-        b = dir.move(a, h, w)
-        a = pi[a]
-        b = pi[b]
-        adj = t.stack([a, b])
-        prop = t.zeros((pattern_count, pattern_count))
-        prop[list(adj)] = 1
-        prop = prop.to_sparse_csr()
-        propagators.append(prop)
+    props = [t.zeros((pattern_count, pattern_count)) for d in dirs]
 
-    return Model(pattern_count, frequencies, propagators)
+    for pi in pis: 
+        h, w = pi.shape
+        pi = pi.flatten()
+        for i, dir in enumerate(dirs):
+            indices = t.arange(0, len(pi), step=1, dtype=t.long,)
+            a = indices[dir.filter(indices, h, w)]
+            b = dir.move(a, h, w)
+            a = pi[a]
+            b = pi[b]
+            adj = t.stack([a, b])
+            props[i][list(adj)] = 1
+
+    for i in range(len(props)):
+        props[i] = props[i].to_sparse_csr()
+
+    return Model(pattern_count, frequencies, props)
 
 
 @dataclass

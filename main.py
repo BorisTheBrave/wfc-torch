@@ -4,7 +4,7 @@ from torchvision.io import read_image, write_png
 from collections import namedtuple
 import numpy
 from wfc import run, make_adacent_model, WFCConfig, Model
-from preprocess import adj_preprocess, overlap_preprocess
+from preprocess import adj_preprocess, overlap_preprocess, make_rotations
 
 LOG_LEVEL = 0
 
@@ -12,15 +12,15 @@ LOG_LEVEL = 0
 
 i = read_image("Angular.png")
 
-#pis, palette, pattern_count, reverse_fn = adj_preprocess([i])
-pis, palette, pattern_count, reverse_fn = overlap_preprocess([i], 2, 2)
+r = make_rotations(i)
 
-pi = pis[0]
+#pis, palette, pattern_count, reverse_fn = adj_preprocess(r)
+pis, palette, pattern_count, reverse_fn = overlap_preprocess(r, 2, 2)
 
 config = WFCConfig(
     h = 10,
     w = 10,
-    model = make_adacent_model(pattern_count, pi)
+    model = make_adacent_model(pattern_count, pis)
 )
 
 result = run(config)
