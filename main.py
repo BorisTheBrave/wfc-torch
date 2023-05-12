@@ -12,8 +12,10 @@ LOG_LEVEL = 0
 
 i = read_image("Angular.png")
 
-#pi, palette, pattern_count, reverse_fn = adj_preprocess(i)
-pi, palette, pattern_count, reverse_fn = overlap_preprocess(i, 2, 2)
+#pis, palette, pattern_count, reverse_fn = adj_preprocess([i])
+pis, palette, pattern_count, reverse_fn = overlap_preprocess([i], 2, 2)
+
+pi = pis[0]
 
 config = WFCConfig(
     h = 10,
