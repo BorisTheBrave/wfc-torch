@@ -26,8 +26,7 @@ class Model:
     frequencies: t.tensor # shape=(p)
     propagators: list[t.Tensor] # shape=(d,from,to). Should be sparse, and of tpe float, with 0 and 1 entries
 
-def make_adacent_model(palette, pi: t.Tensor):
-    pattern_count = len(palette)
+def make_adacent_model(pattern_count, pi: t.Tensor):
     frequencies = t.zeros(pattern_count)
     frequencies.index_add_(0, pi.flatten(), _cheap_ones((pi.numel(),)))
 
@@ -69,12 +68,16 @@ def run(config: WFCConfig):
         p2 = possibilities.reshape((h, w, pattern_count))
         for y in range(h):
             for x in range(w):
-                for p in range(pattern_count):
-                    if p2[y, x, p]:
-                        print(p, end="")
-                    else:
-                        print(" ",end="")
-                print(" ", end="")
+                if not t.any(p2[y, x]).item():
+                    for p in range(pattern_count):
+                        print("x" * len(str(p)), end="")
+                else:
+                    for p in range(pattern_count):
+                        if p2[y, x, p]:
+                            print(p, end="")
+                        else:
+                            print(" " * len(str(p)),end="")
+                print("|", end="")
             print()
 
     def get_decided(possibilities):
@@ -141,7 +144,9 @@ def run(config: WFCConfig):
                 # Restrict possibilites to support
                 possibilities[right_cells, :] *= right_support
 
-            changed_cells = t.concat(new_changed_cells)
+            changed_cells = t.unique(t.concat(new_changed_cells))
+            
+            if LOG_LEVEL >= 5: print_possibilities()
         
         if LOG_LEVEL >= 5: print_possibilities()
 
