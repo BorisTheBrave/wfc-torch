@@ -16,8 +16,9 @@ def palettize(palette, i32):
 def unpalettize(palette, pi):
     return palette[pi]
 
-def make_rotations(img):
-    return [t.rot90(img, k, [1,2]) for k in range(4)]
+def make_rotations(img, rotations):
+    ks = [0,1,2,3] if rotations == 4 else [0, 2] if rotations==2 else [0]
+    return [t.rot90(img, k, [1,2]) for k in ks]
 
 
 def adj_preprocess(imgs): # Returns: pis, palette, pattern_count, reverse_fn

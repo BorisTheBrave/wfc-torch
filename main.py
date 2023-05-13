@@ -6,26 +6,47 @@ import numpy
 from wfc import run, make_adacent_model, WFCConfig, Model
 from preprocess import adj_preprocess, overlap_preprocess, make_rotations
 from torch.profiler import profile, record_function, ProfilerActivity
+import argparse
 
 LOG_LEVEL = 0
 
+parser = argparse.ArgumentParser('wfc', 'Runs the WaveFunctionCollapse algorithm on images', add_help=False)
 
+parser.add_argument("--help", action="help")
+parser.add_argument("-i", "--input", default="Angular.png")
+parser.add_argument("-o", "--output", default="output.png")
+parser.add_argument("-w", "--width", type=int, default=50)
+parser.add_argument("-h", "--height", type=int, default=50)
+parser.add_argument("-n", "--overlap-size", type=int, default=None)
+parser.add_argument("-r", "--rotations", type=int, default=4)
+parser.add_argument("-d", "--device", default="cpu")
+parser.add_argument("--profile", type=bool, default=False)
 
-i = read_image("Angular.png")
+args = parser.parse_args()
 
-r = make_rotations(i)
+i = read_image(args.input)
 
-#pis, palette, pattern_count, reverse_fn = adj_preprocess(r)
-pis, palette, pattern_count, reverse_fn = overlap_preprocess(r, 3, 3)
+r = make_rotations(i, args.rotations)
+
+w = args.width
+h = args.height
+n = args.overlap_size
+
+if n:
+    pis, palette, pattern_count, reverse_fn = overlap_preprocess(r, n, n)
+    w -= n-1
+    h -= n-1
+else:
+    pis, palette, pattern_count, reverse_fn = adj_preprocess(r)
 
 config = WFCConfig(
-    h = 300,
-    w = 300,
+    h = w,
+    w = h,
     model = make_adacent_model(pattern_count, pis),
-    device="cpu"
+    device=args.device
 )
 
-if False:
+if args.profile:
     with profile(activities=[ProfilerActivity.CPU], record_shapes=True, with_stack=True) as prof:
         with record_function("run"):
             result = run(config)
@@ -37,4 +58,4 @@ if False:
 else:
     result = run(config)
 output = reverse_fn(result)
-write_png(output, "output.png")
+write_png(output, args.output)
