@@ -22,6 +22,7 @@ def make_rotations(img, rotations):
 
 
 def adj_preprocess(imgs): # Returns: pis, palette, pattern_count, reverse_fn
+    """Converts each unique color in the images to an integer."""
     i32s = [to_i32(img) for img in imgs]
 
     palette = make_palette(i32s)
@@ -40,6 +41,7 @@ def _pad(pi, y, x):
 
 
 def overlap_preprocess(imgs, nx, ny):
+    """Converts each unique block of nx by ny in the images to an integer."""
     i32s = [to_i32(img) for img in imgs]
     tile_palette = make_palette(i32s)
     tis = [palettize(tile_palette, i32) for i32 in i32s]
