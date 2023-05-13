@@ -132,6 +132,13 @@ def run(config: WFCConfig):
                 print(p2[y,x].item(), end="")
             print()
 
+    def propagate(changed_cells):
+        while len(changed_cells) > 0:
+            if LOG_LEVEL >= 6: print(f"{changed_cells=}")
+            #changed_cells = propagate_once_traced(changed_cells)
+            changed_cells = _propagate_once(changed_cells, possibilities, propagators, h, w)
+
+
     # Remove any patterns that are already impossible
     for dir,prop in zip(dirs, propagators):
         indices = t.arange(0, possibilities.shape[0])
@@ -139,6 +146,8 @@ def run(config: WFCConfig):
         # Does the pattern have any possible support
         possible_patterns = prop.to_dense().amax(dim=0)
         possibilities[mask] *= possible_patterns
+        propagate(indices[mask])
+
 
     # Main loop
     while True:
@@ -167,10 +176,7 @@ def run(config: WFCConfig):
         possibilities[i, p] = 1
         changed_cells = t.tensor([i], device=device, dtype=int)
 
-        while len(changed_cells) > 0:
-            if LOG_LEVEL >= 6: print(f"{changed_cells=}")
-            #changed_cells = propagate_once_traced(changed_cells)
-            changed_cells = _propagate_once(changed_cells, possibilities, propagators, h, w)
+        propagate(changed_cells)
         
         if LOG_LEVEL >= 5: print_possibilities()
 
