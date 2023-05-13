@@ -63,7 +63,7 @@ class WFCConfig:
     device: str = "cpu"
     seed: Optional[int] = None
 
-def _propagate_once(changed_cells, possibilities, propagators, h, w):
+def _propagate_once(changed_cells, possibilities, propagators, h, w, backtrack_info):
     new_changed_cells = []
     #for dir, prop in zip(dirs, propagators):
     for i in range(len(dirs)):
@@ -81,12 +81,20 @@ def _propagate_once(changed_cells, possibilities, propagators, h, w):
         # Check which patterns are supported
         right_support = t.sign(prop @ rightable_possibles.T).T # b p
 
-        # Find changed cells
-        right_changed = right_cells[t.any((right_support == 0) & (possibilities[right_cells] == 1), dim=1)]
-        new_changed_cells.append(right_changed)
+        # Record old values
+        right_possibles = possibilities[right_cells, :]
+
+        new_right_possibles = right_possibles * right_support
 
         # Restrict possibilites to support
-        possibilities[right_cells, :] *= right_support
+        possibilities[right_cells, :] = new_right_possibles
+
+        # Find changed
+        right_changed = right_cells[t.any(right_possibles != new_right_possibles, dim=1)]
+        new_changed_cells.append(right_changed)
+
+        # Record backtrack info
+        backtrack_info.append((right_cells, right_possibles))
     
     return t.unique(t.concat(new_changed_cells))
 
@@ -103,9 +111,10 @@ def run(config: WFCConfig):
     model = config.model
     device = config.device
     pattern_count = model.pattern_count
-    frequencies = model.frequencies
+    frequencies = model.frequencies.to(device)
     propagators = [p.to(device) for p in model.propagators]
     possibilities = t.ones((w * h, pattern_count,), device=device)
+    backtrack_info = []
 
     progress = tqdm.tqdm(total=possibilities.shape[0])
 
@@ -142,7 +151,7 @@ def run(config: WFCConfig):
         while len(changed_cells) > 0:
             if LOG_LEVEL >= 6: print(f"{changed_cells=}")
             #changed_cells = propagate_once_traced(changed_cells)
-            changed_cells = _propagate_once(changed_cells, possibilities, propagators, h, w)
+            changed_cells = _propagate_once(changed_cells, possibilities, propagators, h, w, backtrack_info)
 
 
     # Remove any patterns that are already impossible
@@ -158,34 +167,50 @@ def run(config: WFCConfig):
     # Main loop
     while True:
         # Pick a random index to update
-        contradiction = (possibilities.sum(1) == 0).nonzero().flatten()
-        if len(contradiction) > 0:
-            print("contradiction at ", contradiction.nonzero()[:1])
-            break
-
         undecided = (possibilities.sum(1) > 1).nonzero().flatten().cpu()
         if len(undecided) == 0:
             break
 
         progress.update(possibilities.shape[0] - len(undecided) - progress.n)
 
-        i = numpy.random.choice(undecided.cpu().numpy(), (parallelism,))
+        i = t.tensor(numpy.random.choice(undecided.cpu().numpy(), (parallelism,))).to(device)
         # Pick a random possibility
         # TODO: Use frequencies
         possibles = (possibilities[i] > 0)
         weights = possibles * frequencies
         cweights = weights.cumsum(dim=1)
-        r = t.rand((weights.shape[0])) * cweights[:, -1]
+        r = t.rand((weights.shape[0],), device=device) * cweights[:, -1]
         p = t.searchsorted(cweights, r.unsqueeze(1)).squeeze(1)
         if LOG_LEVEL >= 5: print(f"{i=}")
         if LOG_LEVEL >= 5: print(f"{p=}")
+
+        backtrack_info = []
+
+        backtrack_info.append((i, possibilities[i]))
 
         # Select that specific possibility
         possibilities[i, :] = 0
         possibilities[i, p] = 1
         changed_cells = t.unique(t.tensor(i))
 
+
         propagate(changed_cells)
+
+        contradiction = (possibilities.sum(1) == 0).nonzero().flatten()
+        if len(contradiction) > 0:
+            print("contradiction at ", contradiction.nonzero()[:1])
+            # backtrack
+            for cells, patterns in backtrack_info[::-1]:
+                possibilities[cells, :] = patterns
+
+            if parallelism == 1:
+                # Rule out this choice for next time
+                possibilities[i, p] = 0
+            else:
+                # Change behaviour for next time
+                parallelism = parallelism // 2
+                print(f"Set parallelism to {parallelism}")
+
         
         if LOG_LEVEL >= 5: print_possibilities()
 
