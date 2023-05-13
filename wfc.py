@@ -7,6 +7,7 @@ from dataclasses import dataclass
 import torch as t
 import datetime
 import tqdm
+from typing import Optional
 
 LOG_LEVEL = 0
 
@@ -59,6 +60,7 @@ class WFCConfig:
     w: int
     model: Model
     device: str = "cpu"
+    seed: Optional[int] = None
 
 def _propagate_once(changed_cells, possibilities, propagators, h, w):
     new_changed_cells = []
@@ -89,7 +91,9 @@ def _propagate_once(changed_cells, possibilities, propagators, h, w):
 
 @t.inference_mode()
 def run(config: WFCConfig):
-    #numpy.random.seed(0)
+
+    if config.seed is not None:
+        numpy.random.seed(config.seed)
 
     start = datetime.datetime.now()
     h = config.h
@@ -146,7 +150,7 @@ def run(config: WFCConfig):
         # Does the pattern have any possible support
         possible_patterns = prop.to_dense().amax(dim=0)
         possibilities[mask] *= possible_patterns
-        propagate(indices[mask])
+        propagate(indices[mask].to(device))
 
 
     # Main loop

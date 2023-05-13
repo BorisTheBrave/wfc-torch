@@ -21,6 +21,7 @@ parser.add_argument("-n", "--overlap-size", type=int, default=None)
 parser.add_argument("-r", "--rotations", type=int, default=4)
 parser.add_argument("-d", "--device", default="cpu")
 parser.add_argument("--profile", type=bool, default=False)
+parser.add_argument("--seed", type=int, default=None)
 
 args = parser.parse_args()
 
@@ -43,7 +44,8 @@ config = WFCConfig(
     h = w,
     w = h,
     model = make_adacent_model(pattern_count, pis),
-    device=args.device
+    device=args.device,
+    seed=args.seed,
 )
 
 if args.profile:
