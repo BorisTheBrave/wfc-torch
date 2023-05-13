@@ -59,6 +59,7 @@ class WFCConfig:
     h: int
     w: int
     model: Model
+    parallelism: int = 4
     device: str = "cpu"
     seed: Optional[int] = None
 
@@ -98,6 +99,7 @@ def run(config: WFCConfig):
     start = datetime.datetime.now()
     h = config.h
     w = config.w
+    parallelism = config.parallelism
     model = config.model
     device = config.device
     pattern_count = model.pattern_count
@@ -167,18 +169,21 @@ def run(config: WFCConfig):
 
         progress.update(possibilities.shape[0] - len(undecided) - progress.n)
 
-        i = numpy.random.choice(undecided.cpu().numpy(), (1,)).item()
+        i = numpy.random.choice(undecided.cpu().numpy(), (parallelism,))
         # Pick a random possibility
         # TODO: Use frequencies
-        possibles = (possibilities[i] > 0).nonzero().flatten()
-        p = numpy.random.choice(possibles.cpu().numpy()).item()
+        possibles = (possibilities[i] > 0)
+        weights = possibles * frequencies
+        cweights = weights.cumsum(dim=1)
+        r = t.rand((weights.shape[0])) * cweights[:, -1]
+        p = t.searchsorted(cweights, r.unsqueeze(1)).squeeze(1)
         if LOG_LEVEL >= 5: print(f"{i=}")
         if LOG_LEVEL >= 5: print(f"{p=}")
 
         # Select that specific possibility
         possibilities[i, :] = 0
         possibilities[i, p] = 1
-        changed_cells = t.tensor([i], device=device, dtype=int)
+        changed_cells = t.unique(t.tensor(i))
 
         propagate(changed_cells)
         
