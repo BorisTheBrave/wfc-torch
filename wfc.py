@@ -60,6 +60,34 @@ class WFCConfig:
     model: Model
     device: str = "cpu"
 
+def _propagate_once(changed_cells, possibilities, propagators, h, w):
+    new_changed_cells = []
+    #for dir, prop in zip(dirs, propagators):
+    for i in range(len(dirs)):
+        dir = dirs[i]
+        prop = propagators[i]
+        # cells that have a cell to the right
+        rightable_cells = changed_cells[dir.filter(changed_cells, h, w)] # b
+
+        # Corresponding cell to the right
+        right_cells = dir.move(rightable_cells, h, w)
+
+        # For each index, retrieve possible patterns
+        rightable_possibles = possibilities[rightable_cells] # b p
+
+        # Check which patterns are supported
+        right_support = t.sign(prop @ rightable_possibles.T).T # b p
+
+        # Find changed cells
+        right_changed = right_cells[t.any((right_support == 0) & (possibilities[right_cells] == 1), dim=1)]
+        new_changed_cells.append(right_changed)
+
+        # Restrict possibilites to support
+        possibilities[right_cells, :] *= right_support
+    
+    return t.unique(t.concat(new_changed_cells))
+
+@t.inference_mode()
 def run(config: WFCConfig):
     #numpy.random.seed(0)
 
@@ -111,16 +139,9 @@ def run(config: WFCConfig):
         # Does the pattern have any possible support
         possible_patterns = prop.to_dense().amax(dim=0)
         possibilities[mask] *= possible_patterns
-        
 
     # Main loop
     while True:
-        # decide batch size, n
-        # indices = choose n indices, possibly unnear each other
-        # for indices: pick a random tile from possibiliites
-        # for indices: update possibilites.
-        # set changedTiles = list of changed tiles
-
         # Pick a random index to update
         contradiction = (possibilities.sum(1) == 0).nonzero().flatten()
         if len(contradiction) > 0:
@@ -148,35 +169,8 @@ def run(config: WFCConfig):
 
         while len(changed_cells) > 0:
             if LOG_LEVEL >= 6: print(f"{changed_cells=}")
-            new_changed_cells = []
-            for dir, prop in zip(dirs, propagators):
-                # cells that have a cell to the right
-                rightable_cells = changed_cells[dir.filter(changed_cells, h, w)] # b
-                if LOG_LEVEL >= 10: print(f"{dir.name} {rightable_cells=}")
-
-                # Corresponding cell to the right
-                right_cells = dir.move(rightable_cells, h, w)
-                if LOG_LEVEL >= 10: print(f"{dir.name} {right_cells=}")
-
-                # For each index, retrieve possible patterns
-                rightable_possibles = possibilities[rightable_cells] # b p
-                if LOG_LEVEL >= 10: print(f"{dir.name} {rightable_possibles=}")
-
-                # Check which patterns are supported
-                right_support = t.sign(prop @ rightable_possibles.T).T # b p
-                if LOG_LEVEL >= 10: print(f"{dir.name} {right_support=}")
-
-                # Find changed cells
-                right_changed = right_cells[t.any((right_support == 0) & (possibilities[right_cells] == 1), dim=1)]
-                if LOG_LEVEL >= 10: print(f"{dir.name} {right_changed=}")
-                new_changed_cells.append(right_changed)
-
-                # Restrict possibilites to support
-                possibilities[right_cells, :] *= right_support
-
-            changed_cells = t.unique(t.concat(new_changed_cells))
-            
-            if LOG_LEVEL >= 5: print_possibilities()
+            #changed_cells = propagate_once_traced(changed_cells)
+            changed_cells = _propagate_once(changed_cells, possibilities, propagators, h, w)
         
         if LOG_LEVEL >= 5: print_possibilities()
 
